@@ -1,19 +1,47 @@
 <!DOCTYPE html>
-<html>
+<html lang="pl">
 <head>
-    <meta charset="UTF-8">
-    <title>CRUD Supabase</title>
+  <meta charset="UTF-8">
+  <title>SQLite w przeglądarce</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
 </head>
 <body>
-    <h1>CRUD – Supabase</h1>
+  <h2>SQLite na GitHub Pages</h2>
 
-    <h2>Dodaj zadanie</h2>
-    <input id="newTitle" placeholder="Tytuł zadania">
-    <button onclick="addTask()">Dodaj</button>
+  <textarea id="query" rows="5" cols="60">
+SELECT * FROM users;
+  </textarea><br>
 
-    <h2>Lista zadań</h2>
-    <ul id="taskList"></ul>
+  <button onclick="runQuery()">Wykonaj SQL</button>
 
-    <script type="module" src="app.js"></script>
+  <pre id="output"></pre>
+
+  <script>
+    let db;
+
+    // Ładujemy SQL.js
+    initSqlJs({ locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/${file}` })
+      .then(SQL => {
+        db = new SQL.Database();
+        // Tworzymy przykładową tabelę
+        db.run(`
+          CREATE TABLE users (id INTEGER, name TEXT);
+          INSERT INTO users VALUES (1, 'Ada');
+          INSERT INTO users VALUES (2, 'Bartek');
+          INSERT INTO users VALUES (3, 'Celina');
+        `);
+      });
+
+    function runQuery() {
+      const sql = document.getElementById("query").value;
+
+      try {
+        const result = db.exec(sql);
+        document.getElementById("output").textContent = JSON.stringify(result, null, 2);
+      } catch (e) {
+        document.getElementById("output").textContent = "Błąd:\n" + e;
+      }
+    }
+  </script>
 </body>
 </html>
