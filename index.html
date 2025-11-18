@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
   <meta charset="UTF-8">
-  <title>CRUD SQLite</title>
+  <title>CRUD SQLite – trwała baza</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
 
   <style>
@@ -16,7 +16,7 @@
 </head>
 <body>
 
-  <h2>CRUD – SQLite (sql.js)</h2>
+  <h2>CRUD – SQLite z zapisywaniem danych</h2>
 
   <h3>Dodaj użytkownika</h3>
   <input id="add_id" placeholder="ID">
@@ -28,18 +28,64 @@
 
   <script>
     let db;
+    let SQL;
 
+    // ======= IndexedDB =======
+    const DB_NAME = "moja_baza_sqlite";
+    const STORE_NAME = "sqlite_store";
+
+    function saveToIndexedDB(data) {
+      return new Promise((resolve) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore(STORE_NAME);
+        req.onsuccess = () => {
+          const tx = req.result.transaction(STORE_NAME, "readwrite");
+          tx.objectStore(STORE_NAME).put(data, "dbfile");
+          tx.oncomplete = resolve;
+        };
+      });
+    }
+
+    function loadFromIndexedDB() {
+      return new Promise((resolve) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore(STORE_NAME);
+        req.onsuccess = () => {
+          const tx = req.result.transaction(STORE_NAME, "readonly");
+          const getReq = tx.objectStore(STORE_NAME).get("dbfile");
+          getReq.onsuccess = () => resolve(getReq.result || null);
+        };
+      });
+    }
+
+    // ======= START aplikacji =======
     initSqlJs({ locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/${file}` })
-      .then(SQL => {
-        db = new SQL.Database();
-        db.run(`
-          CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);
-          INSERT INTO users VALUES (1, 'Ada');
-          INSERT INTO users VALUES (2, 'Bartek');
-          INSERT INTO users VALUES (3, 'Celina');
-        `);
+      .then(async (SQLLib) => {
+        SQL = SQLLib;
+
+        const saved = await loadFromIndexedDB();
+
+        if (saved) {
+          // wczytujemy bazę z IndexedDB
+          db = new SQL.Database(new Uint8Array(saved));
+        } else {
+          // tworzymy nową bazę
+          db = new SQL.Database();
+          db.run(`
+            CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);
+            INSERT INTO users VALUES (1, 'Ada');
+            INSERT INTO users VALUES (2, 'Bartek');
+            INSERT INTO users VALUES (3, 'Celina');
+          `);
+        }
+
         refreshTable();
       });
+
+    function saveDB() {
+      const data = db.export();
+      saveToIndexedDB(data);
+    }
 
     function refreshTable() {
       const res = db.exec("SELECT * FROM users");
@@ -69,6 +115,7 @@
       const id = document.getElementById("add_id").value;
       const name = document.getElementById("add_name").value;
       db.run("INSERT INTO users VALUES (?, ?)", [id, name]);
+      saveDB();
       refreshTable();
     }
 
@@ -76,12 +123,14 @@
     function updateUser(id) {
       const newName = document.getElementById("name_" + id).value;
       db.run("UPDATE users SET name = ? WHERE id = ?", [newName, id]);
+      saveDB();
       refreshTable();
     }
 
     // DELETE
     function deleteUser(id) {
       db.run("DELETE FROM users WHERE id = ?", [id]);
+      saveDB();
       refreshTable();
     }
   </script>
