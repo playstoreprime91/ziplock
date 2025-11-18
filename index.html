@@ -2,46 +2,89 @@
 <html lang="pl">
 <head>
   <meta charset="UTF-8">
-  <title>SQLite w przeglądarce</title>
+  <title>CRUD SQLite</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
+
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+    th, td { border: 1px solid #ccc; padding: 8px; }
+    th { background: #eee; }
+    input { padding: 5px; margin: 5px; }
+    button { padding: 5px 10px; margin: 5px; }
+  </style>
 </head>
 <body>
-  <h2>SQLite na GitHub Pages</h2>
 
-  <textarea id="query" rows="5" cols="60">
-SELECT * FROM users;
-  </textarea><br>
+  <h2>CRUD – SQLite (sql.js)</h2>
 
-  <button onclick="runQuery()">Wykonaj SQL</button>
+  <h3>Dodaj użytkownika</h3>
+  <input id="add_id" placeholder="ID">
+  <input id="add_name" placeholder="Imię">
+  <button onclick="createUser()">Dodaj</button>
 
-  <pre id="output"></pre>
+  <h3>Lista użytkowników</h3>
+  <div id="table"></div>
 
   <script>
     let db;
 
-    // Ładujemy SQL.js
     initSqlJs({ locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/${file}` })
       .then(SQL => {
         db = new SQL.Database();
-        // Tworzymy przykładową tabelę
         db.run(`
-          CREATE TABLE users (id INTEGER, name TEXT);
+          CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);
           INSERT INTO users VALUES (1, 'Ada');
           INSERT INTO users VALUES (2, 'Bartek');
           INSERT INTO users VALUES (3, 'Celina');
         `);
+        refreshTable();
       });
 
-    function runQuery() {
-      const sql = document.getElementById("query").value;
+    function refreshTable() {
+      const res = db.exec("SELECT * FROM users");
+      if (res.length === 0) return;
 
-      try {
-        const result = db.exec(sql);
-        document.getElementById("output").textContent = JSON.stringify(result, null, 2);
-      } catch (e) {
-        document.getElementById("output").textContent = "Błąd:\n" + e;
-      }
+      const rows = res[0].values;
+      let html = "<table><tr><th>ID</th><th>Imię</th><th>Akcje</th></tr>";
+
+      rows.forEach(row => {
+        html += `
+          <tr>
+            <td>${row[0]}</td>
+            <td><input id="name_${row[0]}" value="${row[1]}"></td>
+            <td>
+              <button onclick="updateUser(${row[0]})">Edytuj</button>
+              <button onclick="deleteUser(${row[0]})">Usuń</button>
+            </td>
+          </tr>`;
+      });
+
+      html += "</table>";
+      document.getElementById("table").innerHTML = html;
+    }
+
+    // CREATE
+    function createUser() {
+      const id = document.getElementById("add_id").value;
+      const name = document.getElementById("add_name").value;
+      db.run("INSERT INTO users VALUES (?, ?)", [id, name]);
+      refreshTable();
+    }
+
+    // UPDATE
+    function updateUser(id) {
+      const newName = document.getElementById("name_" + id).value;
+      db.run("UPDATE users SET name = ? WHERE id = ?", [newName, id]);
+      refreshTable();
+    }
+
+    // DELETE
+    function deleteUser(id) {
+      db.run("DELETE FROM users WHERE id = ?", [id]);
+      refreshTable();
     }
   </script>
+
 </body>
 </html>
