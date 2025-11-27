@@ -2,24 +2,21 @@
 <html lang="pl">
 <head>
   <meta charset="utf-8" />
-  <title>CRUD — Supabase (wspólna baza)</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CRUD Supabase — wspólna baza</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; max-width: 900px; margin: auto; }
+    body { font-family: Arial; padding: 20px; max-width: 900px; margin: auto; }
     table { border-collapse: collapse; width: 100%; margin-top: 12px; }
     th, td { border: 1px solid #ddd; padding: 8px; }
     th { background:#f2f2f2; text-align: left; }
     input, button { padding: 6px; margin: 4px 6px 4px 0; }
     #status { margin-top: 8px; color: #666; font-size: 14px; }
-    .small { font-size: 13px; color: #444; }
   </style>
-  <!-- supabase-js CDN -->
+  <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
 </head>
 <body>
   <h2>CRUD — Supabase (wspólna baza)</h2>
-
-  <p class="small">Uwaga: jeśli chcesz, żebym dodał logowanie lub RLS (ograniczenia dostępu), napisz — zrobię to.</p>
 
   <h3>Dodaj użytkownika</h3>
   <input id="add_id" placeholder="ID (liczba)" type="number">
@@ -28,52 +25,53 @@
 
   <h3>Lista użytkowników</h3>
   <div id="table"></div>
-
   <div id="status"></div>
 
 <script>
-  // ---- Wklejone Twoje wartości Supabase ----
+  // ------------------------
+  // Konfiguracja Supabase
+  // ------------------------
   const SUPABASE_URL = "https://hhqlozuhbrczjxtlsofj.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocWxvenVoYnJjemp4dGxzb2ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyNTUzODgsImV4cCI6MjA3OTgzMTM4OH0.YSBBmqKLV0-A-Udzg3LArNATdHl8_cXszSXJWnmTTMk";
-  // ------------------------------------------
 
-  // inicjalizacja klienta Supabase (globalny obiekt 'supabase' z CDN)
-  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   const statusEl = document.getElementById('status');
 
-  // Fetch i render
+  // ------------------------
+  // Funkcje CRUD
+  // ------------------------
+
   async function fetchUsers() {
-    setStatus('Ładowanie użytkowników...');
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .order('id', { ascending: true });
+    setStatus("Ładowanie...");
+    const { data, error } = await client
+      .from("users")
+      .select("*")
+      .order("id", { ascending: true });
 
     if (error) {
-      setStatus('Błąd ładowania: ' + error.message);
+      setStatus("Błąd: " + error.message);
       console.error(error);
-      document.getElementById('table').innerHTML = '<p style="color:red">Błąd ładowania danych.</p>';
+      document.getElementById("table").innerHTML = "<p style='color:red'>Błąd ładowania danych</p>";
       return;
     }
 
     renderTable(data || []);
-    setStatus('Gotowe. Ostatnia aktualizacja: ' + new Date().toLocaleTimeString());
+    setStatus("Gotowe. Ostatnia aktualizacja: " + new Date().toLocaleTimeString());
   }
 
   function renderTable(rows) {
     if (!rows || rows.length === 0) {
-      document.getElementById('table').innerHTML = '<p>Brak użytkowników (tabela pusta).</p>';
+      document.getElementById("table").innerHTML = "<p>Brak użytkowników</p>";
       return;
     }
 
-    let html = `<table><tr><th>ID</th><th>Imię</th><th>Akcje</th></tr>`;
+    let html = "<table><tr><th>ID</th><th>Imię</th><th>Akcje</th></tr>";
     rows.forEach(r => {
-      const name = escapeHtml(r.name || '');
       html += `
         <tr>
           <td>${r.id}</td>
-          <td><input id="name_${r.id}" value="${name}"></td>
+          <td><input id="name_${r.id}" value="${escapeHtml(r.name || '')}"></td>
           <td>
             <button onclick="updateUser(${r.id})">Zapisz</button>
             <button onclick="deleteUser(${r.id})">Usuń</button>
@@ -81,106 +79,90 @@
         </tr>
       `;
     });
-    html += `</table>`;
-    document.getElementById('table').innerHTML = html;
+    html += "</table>";
+    document.getElementById("table").innerHTML = html;
   }
 
-  // CREATE
   async function createUser() {
-    const idVal = document.getElementById('add_id').value;
-    const id = idVal === '' ? null : parseInt(idVal, 10);
-    const name = document.getElementById('add_name').value.trim();
+    const idVal = document.getElementById("add_id").value;
+    const id = idVal === "" ? null : parseInt(idVal, 10);
+    const name = document.getElementById("add_name").value.trim();
 
-    if (!Number.isInteger(id) || name === '') {
-      alert('Podaj poprawne ID (liczba) i imię.');
+    if (!Number.isInteger(id) || name === "") {
+      alert("Podaj poprawne ID i imię");
       return;
     }
 
-    setStatus('Dodawanie...');
-    const { error } = await supabase
-      .from('users')
+    setStatus("Dodawanie...");
+    const { error } = await client
+      .from("users")
       .insert([{ id, name }]);
+
     if (error) {
-      // może konflikt PK — pokaż komunikat
-      setStatus('Błąd dodawania: ' + error.message);
+      setStatus("Błąd dodawania: " + error.message);
       console.error(error);
     } else {
-      setStatus('Użytkownik dodany.');
-      document.getElementById('add_id').value = '';
-      document.getElementById('add_name').value = '';
-      // fetchUsers(); // możemy polegać na Realtime — lecz dla pewności pobierz listę
-      // krótkie opóźnienie żeby Realtime zdążył, albo pobierz od razu:
+      setStatus("Użytkownik dodany");
+      document.getElementById("add_id").value = "";
+      document.getElementById("add_name").value = "";
       fetchUsers();
     }
   }
 
-  // UPDATE
   async function updateUser(id) {
-    const newName = document.getElementById('name_' + id).value.trim();
-    if (newName === '') { alert('Imię nie może być puste'); return; }
-    setStatus('Aktualizacja...');
-    const { error } = await supabase
-      .from('users')
+    const newName = document.getElementById("name_" + id).value.trim();
+    if (newName === "") { alert("Imię nie może być puste"); return; }
+
+    setStatus("Aktualizacja...");
+    const { error } = await client
+      .from("users")
       .update({ name: newName })
-      .eq('id', id);
+      .eq("id", id);
 
     if (error) {
-      setStatus('Błąd aktualizacji: ' + error.message);
-      console.error(error);
+      setStatus("Błąd aktualizacji: " + error.message);
     } else {
-      setStatus('Zapisano.');
-      // fetchUsers(); // niekonieczne jeśli działa Realtime
+      setStatus("Zapisano");
     }
   }
 
-  // DELETE
   async function deleteUser(id) {
-    if (!confirm('Na pewno usunąć użytkownika o ID ' + id + '?')) return;
-    setStatus('Usuwanie...');
-    const { error } = await supabase
-      .from('users')
+    if (!confirm("Na pewno usunąć użytkownika o ID " + id + "?")) return;
+
+    setStatus("Usuwanie...");
+    const { error } = await client
+      .from("users")
       .delete()
-      .eq('id', id);
+      .eq("id", id);
 
     if (error) {
-      setStatus('Błąd usuwania: ' + error.message);
-      console.error(error);
+      setStatus("Błąd usuwania: " + error.message);
     } else {
-      setStatus('Usunięto.');
-      // fetchUsers(); // Realtime powinien wywołać automatycznie
+      setStatus("Usunięto");
       fetchUsers();
     }
   }
 
-  // utilities
   function setStatus(txt) { statusEl.textContent = txt; }
   function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-  // Podłącz przyciski
-  document.getElementById('btnAdd').addEventListener('click', createUser);
+  document.getElementById("btnAdd").addEventListener("click", createUser);
 
-  // === Realtime (wszystkie zdarzenia) ===
-  // Supabase Realtime na kanale Postgres changes -> odświeżamy listę po zmianie
+  // ------------------------
+  // Realtime
+  // ------------------------
   (function setupRealtime() {
     try {
-      // utworzenie kanału i subskrypcja wszystkich zmian na tabeli 'users'
-      supabase.channel('public:users')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, payload => {
-          console.log('Realtime payload', payload);
-          // prosty refresh (możesz zoptymalizować: aktualizować tylko zmieniony wiersz)
+      client.channel("public:users")
+        .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => {
           fetchUsers();
         })
-        .subscribe()
-        .then(() => console.log('Realtime subscribed'))
-        .catch(err => console.warn('Realtime sub error', err));
-    } catch (err) {
-      console.warn('Realtime może nie być dostępne w tej konfiguracji', err);
-    }
+        .subscribe();
+    } catch(e) { console.warn("Realtime nie działa", e); }
   })();
 
-  // pierwsze załadowanie
+  // Pierwsze ładowanie
   fetchUsers();
 </script>
 </body>
 </html>
-
