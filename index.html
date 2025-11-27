@@ -1,45 +1,46 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-  <meta charset="utf-8" />
-  <title>CRUD Supabase — wspólna baza</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
-    body { font-family: Arial; padding: 20px; max-width: 900px; margin: auto; }
-    table { border-collapse: collapse; width: 100%; margin-top: 12px; }
-    th, td { border: 1px solid #ddd; padding: 8px; }
-    th { background:#f2f2f2; text-align: left; }
-    input, button { padding: 6px; margin: 4px 6px 4px 0; }
-    #status { margin-top: 8px; color: #666; font-size: 14px; }
-  </style>
-  <!-- Supabase JS -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
+<meta charset="UTF-8">
+<title>CRUD Supabase — wspólna baza</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body { font-family: Arial; padding: 20px; max-width: 900px; margin: auto; }
+  table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+  th, td { border: 1px solid #ddd; padding: 8px; }
+  th { background:#f2f2f2; text-align: left; }
+  input, button { padding: 6px; margin: 4px 6px 4px 0; }
+  #status { margin-top: 8px; color: #666; font-size: 14px; }
+</style>
 </head>
 <body>
-  <h2>CRUD — Supabase (wspólna baza)</h2>
 
-  <h3>Dodaj użytkownika</h3>
-  <input id="add_id" placeholder="ID (liczba)" type="number">
-  <input id="add_name" placeholder="Imię" type="text">
-  <button id="btnAdd">Dodaj</button>
+<h2>CRUD — Supabase (wspólna baza)</h2>
 
-  <h3>Lista użytkowników</h3>
-  <div id="table"></div>
-  <div id="status"></div>
+<h3>Dodaj użytkownika</h3>
+<input id="add_id" placeholder="ID (liczba)" type="number">
+<input id="add_name" placeholder="Imię" type="text">
+<button id="btnAdd">Dodaj</button>
 
-<script>
-  // ------------------------
-  // Konfiguracja Supabase
-  // ------------------------
+<h3>Lista użytkowników</h3>
+<div id="table"></div>
+<div id="status"></div>
+
+<script type="module">
+  import { createClient } from "https://unpkg.com/@supabase/supabase-js@2/dist/esm/supabase.js";
+
   const SUPABASE_URL = "https://hhqlozuhbrczjxtlsofj.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocWxvenVoYnJjemp4dGxzb2ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyNTUzODgsImV4cCI6MjA3OTgzMTM4OH0.YSBBmqKLV0-A-Udzg3LArNATdHl8_cXszSXJWnmTTMk";
 
-  const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
+  const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const statusEl = document.getElementById('status');
 
+  // utilities
+  function setStatus(txt) { statusEl.textContent = txt; }
+  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
   // ------------------------
-  // Funkcje CRUD
+  // CRUD FUNCTIONS
   // ------------------------
 
   async function fetchUsers() {
@@ -143,9 +144,7 @@
     }
   }
 
-  function setStatus(txt) { statusEl.textContent = txt; }
-  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
+  // Podłącz przycisk
   document.getElementById("btnAdd").addEventListener("click", createUser);
 
   // ------------------------
@@ -161,8 +160,9 @@
     } catch(e) { console.warn("Realtime nie działa", e); }
   })();
 
-  // Pierwsze ładowanie
+  // Pierwsze załadowanie
   fetchUsers();
+
 </script>
 </body>
 </html>
