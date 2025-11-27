@@ -1,139 +1,167 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-  <meta charset="UTF-8">
-  <title>CRUD SQLite – trwała baza</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
-
+  <meta charset="utf-8" />
+  <title>CRUD — Supabase (wspólna baza)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { font-family: Arial; padding: 20px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 15px; }
-    th, td { border: 1px solid #ccc; padding: 8px; }
-    th { background: #eee; }
-    input { padding: 5px; margin: 5px; }
-    button { padding: 5px 10px; margin: 5px; }
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 900px; margin: auto; }
+    table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+    th, td { border: 1px solid #ddd; padding: 8px; }
+    th { background:#f2f2f2; }
+    input, button { padding: 6px; margin: 4px 6px 4px 0; }
+    #status { margin-top: 8px; color: #666; font-size: 14px; }
   </style>
+  <!-- supabase-js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
 </head>
 <body>
-
-  <h2>CRUD – SQLite z zapisywaniem danych</h2>
+  <h2>CRUD — Supabase (wspólna baza)</h2>
 
   <h3>Dodaj użytkownika</h3>
-  <input id="add_id" placeholder="ID">
-  <input id="add_name" placeholder="Imię">
-  <button onclick="createUser()">Dodaj</button>
+  <input id="add_id" placeholder="ID (liczba)" type="number">
+  <input id="add_name" placeholder="Imię" type="text">
+  <button id="btnAdd">Dodaj</button>
 
   <h3>Lista użytkowników</h3>
   <div id="table"></div>
 
-  <script>
-    let db;
-    let SQL;
+  <div id="status"></div>
 
-    // ======= IndexedDB =======
-    const DB_NAME = "moja_baza_sqlite";
-    const STORE_NAME = "sqlite_store";
+<script>
+  // -> Wklej tutaj swoje wartości:
+  const SUPABASE_URL = "https://xxxxxx.supabase.co"; // <- zamień
+  const SUPABASE_ANON_KEY = "eyJ..."; // <- zamień
 
-    function saveToIndexedDB(data) {
-      return new Promise((resolve) => {
-        const req = indexedDB.open(DB_NAME, 1);
-        req.onupgradeneeded = () => req.result.createObjectStore(STORE_NAME);
-        req.onsuccess = () => {
-          const tx = req.result.transaction(STORE_NAME, "readwrite");
-          tx.objectStore(STORE_NAME).put(data, "dbfile");
-          tx.oncomplete = resolve;
-        };
-      });
+  const supabase = supabaseLib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const statusEl = document.getElementById('status');
+
+  // Fetch i render
+  async function fetchUsers() {
+    setStatus('Ładowanie użytkowników...');
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .order('id', { ascending: true });
+
+    if (error) {
+      setStatus('Błąd ładowania: ' + error.message);
+      console.error(error);
+      return;
     }
 
-    function loadFromIndexedDB() {
-      return new Promise((resolve) => {
-        const req = indexedDB.open(DB_NAME, 1);
-        req.onupgradeneeded = () => req.result.createObjectStore(STORE_NAME);
-        req.onsuccess = () => {
-          const tx = req.result.transaction(STORE_NAME, "readonly");
-          const getReq = tx.objectStore(STORE_NAME).get("dbfile");
-          getReq.onsuccess = () => resolve(getReq.result || null);
-        };
-      });
+    renderTable(data || []);
+    setStatus('Gotowe. Ostatnia aktualizacja: ' + new Date().toLocaleTimeString());
+  }
+
+  function renderTable(rows) {
+    let html = `<table><tr><th>ID</th><th>Imię</th><th>Akcje</th></tr>`;
+    rows.forEach(r => {
+      html += `
+        <tr>
+          <td>${r.id}</td>
+          <td><input id="name_${r.id}" value="${escapeHtml(r.name || '')}"></td>
+          <td>
+            <button onclick="updateUser(${r.id})">Zapisz</button>
+            <button onclick="deleteUser(${r.id})">Usuń</button>
+          </td>
+        </tr>
+      `;
+    });
+    html += `</table>`;
+    document.getElementById('table').innerHTML = html;
+  }
+
+  // CREATE
+  async function createUser() {
+    const id = parseInt(document.getElementById('add_id').value, 10);
+    const name = document.getElementById('add_name').value.trim();
+
+    if (!Number.isInteger(id) || name === '') {
+      alert('Podaj poprawne ID i imię.');
+      return;
     }
 
-    // ======= START aplikacji =======
-    initSqlJs({ locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/${file}` })
-      .then(async (SQLLib) => {
-        SQL = SQLLib;
+    setStatus('Dodawanie...');
+    const { error } = await supabase
+      .from('users')
+      .insert([{ id, name }]);
 
-        const saved = await loadFromIndexedDB();
-
-        if (saved) {
-          // wczytujemy bazę z IndexedDB
-          db = new SQL.Database(new Uint8Array(saved));
-        } else {
-          // tworzymy nową bazę
-          db = new SQL.Database();
-          db.run(`
-            CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);
-            INSERT INTO users VALUES (1, 'Ada');
-            INSERT INTO users VALUES (2, 'Bartek');
-            INSERT INTO users VALUES (3, 'Celina');
-          `);
-        }
-
-        refreshTable();
-      });
-
-    function saveDB() {
-      const data = db.export();
-      saveToIndexedDB(data);
+    if (error) {
+      setStatus('Błąd dodawania: ' + error.message);
+      console.error(error);
+    } else {
+      setStatus('Użytkownik dodany.');
+      document.getElementById('add_id').value = '';
+      document.getElementById('add_name').value = '';
+      // fetchUsers();  // nie musimy wywoływać jeśli działa realtime; inaczej odkomentuj
     }
+  }
 
-    function refreshTable() {
-      const res = db.exec("SELECT * FROM users");
-      if (res.length === 0) return;
+  // UPDATE
+  async function updateUser(id) {
+    const newName = document.getElementById('name_' + id).value.trim();
+    if (newName === '') { alert('Imię nie może być puste'); return; }
+    setStatus('Aktualizacja...');
+    const { error } = await supabase
+      .from('users')
+      .update({ name: newName })
+      .eq('id', id);
 
-      const rows = res[0].values;
-      let html = "<table><tr><th>ID</th><th>Imię</th><th>Akcje</th></tr>";
-
-      rows.forEach(row => {
-        html += `
-          <tr>
-            <td>${row[0]}</td>
-            <td><input id="name_${row[0]}" value="${row[1]}"></td>
-            <td>
-              <button onclick="updateUser(${row[0]})">Edytuj</button>
-              <button onclick="deleteUser(${row[0]})">Usuń</button>
-            </td>
-          </tr>`;
-      });
-
-      html += "</table>";
-      document.getElementById("table").innerHTML = html;
+    if (error) {
+      setStatus('Błąd aktualizacji: ' + error.message);
+      console.error(error);
+    } else {
+      setStatus('Zapisano.');
     }
+  }
 
-    // CREATE
-    function createUser() {
-      const id = document.getElementById("add_id").value;
-      const name = document.getElementById("add_name").value;
-      db.run("INSERT INTO users VALUES (?, ?)", [id, name]);
-      saveDB();
-      refreshTable();
+  // DELETE
+  async function deleteUser(id) {
+    if (!confirm('Na pewno usunąć użytkownika o ID ' + id + '?')) return;
+    setStatus('Usuwanie...');
+    const { error } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      setStatus('Błąd usuwania: ' + error.message);
+      console.error(error);
+    } else {
+      setStatus('Usunięto.');
     }
+  }
 
-    // UPDATE
-    function updateUser(id) {
-      const newName = document.getElementById("name_" + id).value;
-      db.run("UPDATE users SET name = ? WHERE id = ?", [newName, id]);
-      saveDB();
-      refreshTable();
+  // utilities
+  function setStatus(txt) { statusEl.textContent = txt; }
+  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  // Podłącz przyciski
+  document.getElementById('btnAdd').addEventListener('click', createUser);
+
+  // === Realtime (opcjonalnie) ===
+  // Dzięki temu wszyscy widzą zmiany "na żywo".
+  // Jeśli wolisz nie używać realtime, usuń poniższy blok i odkomentuj fetchUsers() w createUser()
+  (function setupRealtime() {
+    try {
+      // subskrybuj wszystkie zmiany w tabeli users
+      supabase.channel('public:users')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, payload => {
+          console.log('Realtime payload', payload);
+          // po każdej zmianie pobieramy aktualną listę
+          fetchUsers();
+        })
+        .subscribe()
+        .then(() => console.log('Realtime subscribed'));
+    } catch (err) {
+      console.warn('Realtime może nie być dostępne w tej wersji klienta lub konfiguracji', err);
     }
+  })();
 
-    // DELETE
-    function deleteUser(id) {
-      db.run("DELETE FROM users WHERE id = ?", [id]);
-      saveDB();
-      refreshTable();
-    }
-  </script>
-
+  // pierwsze załadowanie
+  fetchUsers();
+</script>
 </body>
 </html>
